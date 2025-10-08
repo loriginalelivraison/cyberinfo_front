@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import Logo from "../components/logo";
+import Logo from "../components/Logo.jsx";
 
 export default function Home() {
   const services = [
