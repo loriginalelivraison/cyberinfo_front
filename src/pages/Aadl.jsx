@@ -16,7 +16,7 @@ export default function Aadl() {
     if (!name.trim() || !phone.trim()) { setErr("Nom et téléphone obligatoires."); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/aadl`, {
+      const res = await fetch(`${API}/api/aadl`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim(), familyname: familyname.trim(), phone: phone.trim() }),
