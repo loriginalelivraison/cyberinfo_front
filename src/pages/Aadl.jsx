@@ -1,5 +1,5 @@
 import { useState } from "react";
-import Logo from "../components/logo";
+import Logo from "../components/Logo.jsx";
 const API = import.meta.env.VITE_API_URL; // ex: http://localhost:8080
 
 export default function Aadl() {
