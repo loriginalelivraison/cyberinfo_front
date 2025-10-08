@@ -1,6 +1,5 @@
 import { useMemo, useState, } from "react";
-
-const API = import.meta.env.VITE_API_URL; // ex: http://localhost:8080
+const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
 
 // ---- helpers ---------------------------------------------------------------
 function guessFormatFromUrl(u) {
@@ -96,7 +95,7 @@ function FileCard({ file, onDeleted }) {
     const ok = confirm(`Supprimer ce fichier "${name || url}" ?`);
     if (!ok) return;
     try {
-      const endpoint = `${API}/docimpression/file?url=${encodeURIComponent(url)}`;
+      const endpoint = `${API}/api/docimpression/file?url=${encodeURIComponent(url)}`;
       const res = await fetch(endpoint, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
