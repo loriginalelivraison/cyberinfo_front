@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import Logo from "../components/logo.jsx";
+import Logo from "../components/Logo.jsx";
 import DocsList from "../components/DocsList.jsx";
 
 const API = import.meta.env.VITE_API_URL;
