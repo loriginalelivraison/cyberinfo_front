@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import Logo from "../components/logo";
+import Logo from "./logo";
 
 export default function Layout() {
   return (
