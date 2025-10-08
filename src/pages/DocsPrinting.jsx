@@ -71,7 +71,7 @@ export default function DocsPrinting() {
     try {
       setErr(null);
       setLoading(true);
-      const res = await fetch(`${API}/docimpression`);
+      const res = await fetch(`${API}/api/docimpression`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setDocs(normalizeDocs(data));

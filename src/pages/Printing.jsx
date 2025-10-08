@@ -115,7 +115,7 @@ export default function Printing() {
     try {
       setListErr(null);
       setListLoading(true);
-      const res = await fetch(`${API}/docimpression`);
+      const res = await fetch(`${API}/api/docimpression`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setDocs(normalizeDocs(data));
@@ -169,7 +169,7 @@ export default function Printing() {
       const uploaded = [...imgRes, ...mediaRes, ...pdfRes, ...fileRes];
 
       // Sauvegarde BDD
-      const saveRes = await fetch(`${API}/docimpression`, {
+      const saveRes = await fetch(`${API}/api/docimpression`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
