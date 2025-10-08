@@ -12,6 +12,48 @@ const VIDEO_UPLOAD_ENDPOINT = `${API}/api/upload/video`;
 const FILE_UPLOAD_ENDPOINT  = `${API}/api/upload/file`; // générique (docx/xlsx/zip/apk...)
 
 // ---------- helpers upload ----------
+// Détecte/normalise une URL locale d'uploads -> /api/uploads/...
+function normalizeLocalUploads(u) {
+  try {
+    const url = new URL(u, window.location.origin);
+    const p = url.pathname;
+    if (p.startsWith("/api/uploads/")) return p;      // déjà bon
+    if (p.startsWith("/uploads/")) return `/api${p}`; // ajoute le préfixe /api
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function buildOpenUrl({ url, public_id, format, resource_type }) {
+  // 1) si c'est un fichier local => route statique /api/uploads/...
+  const local = normalizeLocalUploads(url);
+  if (local) return `${API}${local}`; // en prod: "/api/...", en dev: "http://localhost:8080/api/..."
+
+  // 2) sinon (Cloudinary, lien externe, etc.)
+  return url || "#";
+}
+
+// URL de téléchargement (tu peux garder la tienne, ou harmoniser pareil)
+function buildDownloadUrl({ url, public_id, format, resource_type }) {
+  const local = normalizeLocalUploads(url);
+  if (local) {
+    // si tu veux “forcer téléchargement”, garde tes endpoints /api/upload/<type>/<file>
+    // ou sinon télécharge direct la ressource statique:
+    return `${API}${local}`;
+  }
+  try {
+    if (url && url.includes("/api/upload/")) {
+      const u = new URL(url, window.location.origin);
+      u.pathname = u.pathname.replace("/api/upload/", "/api/upload/fl_attachment/");
+      return u.toString();
+    }
+  } catch {}
+  return url || "#";
+}
+
+
+
 function resourceTypeFor(file) {
   const name = (file.name || "").toLowerCase();
   const type = (file.type || "").toLowerCase();
