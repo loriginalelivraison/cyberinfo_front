@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Logo from "../components/Logo.jsx";
 import DocsList from "../components/DocsList.jsx";
 
-const API = import.meta.env.VITE_API_URL; // ex: http://localhost:8080
+const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
 
 // Endpoints locaux
 const PDF_UPLOAD_ENDPOINT   = `${API}/api/upload/pdf`;
