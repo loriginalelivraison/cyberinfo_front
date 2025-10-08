@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://TON-BACKEND.herokuapp.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://TON-BACKEND.herokuapp.com/:path*" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
