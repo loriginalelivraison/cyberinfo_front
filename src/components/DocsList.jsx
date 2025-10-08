@@ -41,7 +41,7 @@ function buildOpenUrl({ url, public_id, format, resource_type }) {
   if (isLocalImageUrl(url)) return url || "#";
   if (isLocalMediaUrl(url)) return url || "#";
   if (isLocalFileUrl(url))  return url || "#";
-  try { if (url && url.includes("/raw/upload/")) return url; } catch {}
+  try { if (url && url.includes("/api/raw/upload/")) return url; } catch {}
   return url || "#";
 }
 
