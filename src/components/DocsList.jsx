@@ -52,9 +52,9 @@ function buildDownloadUrl({ url, public_id, format, resource_type }) {
   if (isLocalMediaUrl(url)) { try { const f = new URL(url).pathname.split("/").pop(); return `${API}/api/upload/video/${f}`; } catch { return url || "#"; } }
   if (isLocalFileUrl(url))  { try { const f = new URL(url).pathname.split("/").pop(); return `${API}/api/upload/file/${f}`; } catch { return url || "#"; } }
   try {
-    if (url && url.includes("/upload/")) {
+    if (url && url.includes("/api/upload/")) {
       const u = new URL(url);
-      u.pathname = u.pathname.replace("/upload/", "/upload/fl_attachment/");
+      u.pathname = u.pathname.replace("/api/upload/", "/api/upload/fl_attachment/");
       return u.toString();
     }
   } catch {}
