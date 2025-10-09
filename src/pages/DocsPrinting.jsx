@@ -1,10 +1,10 @@
+// src/pages/DocsPrinting.jsx
 import { useEffect, useState } from "react";
 import Logo from "../components/Logo.jsx";
 import DocsList from "../components/DocsList.jsx";
 
 const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
 
-// ✅ déduire l'extension si manquante
 function extFromUrl(u) {
   try {
     const p = new URL(u).pathname;
@@ -20,15 +20,11 @@ function normalizeDocs(data) {
   const out = [];
 
   for (const item of data) {
-    // Cas groupe: { name, files: [...] }
     if (Array.isArray(item.files)) {
-      if (item.files.length === 0) {
-        // ⚠️ ne rien pousser si le groupe n’a plus de fichiers
-        continue;
-      }
+      if (item.files.length === 0) continue;
       for (const f of item.files) {
         const url = f.secure_url || f.url;
-        if (!url) continue; // sécurité
+        if (!url) continue;
         out.push({
           url,
           public_id: f.public_id || item._id,
@@ -40,10 +36,9 @@ function normalizeDocs(data) {
           note: item.note,
         });
       }
-      continue; // on a traité le cas groupe, on passe au suivant
+      continue;
     }
 
-    // Cas à plat (anciens enregistrements)
     const url = item.secure_url || item.url;
     if (!url) continue;
     out.push({
@@ -58,7 +53,6 @@ function normalizeDocs(data) {
     });
   }
 
-  // Optionnel: on retire toute ligne sans URL valide (au cas où)
   return out.filter((x) => !!x.url);
 }
 

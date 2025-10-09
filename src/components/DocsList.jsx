@@ -1,7 +1,10 @@
-import { useMemo, useState, } from "react";
+// src/components/DocsList.jsx
+import { useMemo, useState } from "react";
+
 const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
 
-// ---- helpers ---------------------------------------------------------------
+/* Détecte un type affichable à partir de l’URL/format/resource_type
+   (Cloudinary renvoie resource_type: "image" | "video" | "raw") */
 function guessFormatFromUrl(u) {
   try {
     const m = new URL(u).pathname.match(/\.([a-z0-9]+)$/i);
@@ -9,56 +12,23 @@ function guessFormatFromUrl(u) {
   } catch { return undefined; }
 }
 
-function isLocalPdfUrl(url)   { try { return new URL(url).pathname.includes("/uploads/pdfs/");   } catch { return false; } }
-function isLocalImageUrl(url) { try { return new URL(url).pathname.includes("/uploads/images/"); } catch { return false; } }
-function isLocalMediaUrl(url) { try { return new URL(url).pathname.includes("/uploads/videos/"); } catch { return false; } }
-function isLocalFileUrl(url)  { try { return new URL(url).pathname.includes("/uploads/files/");  } catch { return false; } }
-
 function deriveResourceType({ url, resource_type, format }) {
   if (resource_type) return resource_type;
-
-  if (isLocalPdfUrl(url)) return "raw";
-  if (isLocalImageUrl(url)) return "image";
-  if (isLocalMediaUrl(url)) {
-    const ext = (format || guessFormatFromUrl(url) || "").toLowerCase();
-    if (["mp3","wav","ogg","m4a"].includes(ext)) return "audio";
-    return "video";
-  }
-  if (isLocalFileUrl(url)) return "file";
-
   const ext = (format || guessFormatFromUrl(url) || "").toLowerCase();
-  if (["pdf"].includes(ext)) return "raw";
   if (["mp4","webm","mov","mkv","avi","m4v"].includes(ext)) return "video";
   if (["mp3","wav","ogg","m4a"].includes(ext)) return "audio";
   if (["jpg","jpeg","png","gif","webp","heic","bmp","tiff"].includes(ext)) return "image";
+  if (["pdf"].includes(ext)) return "raw";
   return "file";
 }
 
-// URL d’ouverture
-function buildOpenUrl({ url, public_id, format, resource_type }) {
-  const rt = deriveResourceType({ url, resource_type, format });
-  if (isLocalPdfUrl(url))   return url || "#";
-  if (isLocalImageUrl(url)) return url || "#";
-  if (isLocalMediaUrl(url)) return url || "#";
-  if (isLocalFileUrl(url))  return url || "#";
-  try { if (url && url.includes("/api/raw/upload/")) return url; } catch {}
-  return url || "#";
-}
-
-// URL de téléchargement
-function buildDownloadUrl({ url, public_id, format, resource_type }) {
-  if (isLocalPdfUrl(url))   { try { const f = new URL(url).pathname.split("/").pop(); return `${API}/api/upload/pdf/${f}`; } catch { return url || "#"; } }
-  if (isLocalImageUrl(url)) { try { const f = new URL(url).pathname.split("/").pop(); return `${API}/api/upload/image/${f}`; } catch { return url || "#"; } }
-  if (isLocalMediaUrl(url)) { try { const f = new URL(url).pathname.split("/").pop(); return `${API}/api/upload/video/${f}`; } catch { return url || "#"; } }
-  if (isLocalFileUrl(url))  { try { const f = new URL(url).pathname.split("/").pop(); return `${API}/api/upload/file/${f}`; } catch { return url || "#"; } }
+// Forcer le téléchargement Cloudinary : /upload/ -> /upload/fl_attachment/
+function toDownloadUrl(u) {
   try {
-    if (url && url.includes("/api/upload/")) {
-      const u = new URL(url);
-      u.pathname = u.pathname.replace("/api/upload/", "/api/upload/fl_attachment/");
-      return u.toString();
-    }
-  } catch {}
-  return url || "#";
+    const cu = new URL(u);
+    cu.pathname = cu.pathname.replace("/upload/", "/upload/fl_attachment/");
+    return cu.toString();
+  } catch { return u; }
 }
 
 function humanSize(bytes) {
@@ -72,7 +42,6 @@ function humanSize(bytes) {
   return `${gb.toFixed(2)} Go`;
 }
 
-// ---- UI --------------------------------------------------------------------
 function FileCard({ file, onDeleted }) {
   const { url, public_id, format, bytes, resource_type, name, uploadedAt } = file;
 
@@ -81,21 +50,17 @@ function FileCard({ file, onDeleted }) {
     [url, resource_type, format]
   );
 
-  const openUrl = useMemo(
-    () => buildOpenUrl({ url, public_id, format, resource_type: rt }),
-    [url, public_id, format, rt]
-  );
-
-  const downloadUrl = useMemo(
-    () => buildDownloadUrl({ url, public_id, format, resource_type: rt }),
-    [url, public_id, format, rt]
-  );
+  const openUrl = url;                 // Ouvrir directement l’URL Cloudinary
+  const downloadUrl = toDownloadUrl(url);
 
   async function handleDelete() {
     const ok = confirm(`Supprimer ce fichier "${name || url}" ?`);
     if (!ok) return;
     try {
-      const endpoint = `${API}/api/docimpression/file?url=${encodeURIComponent(url)}`;
+      const qs = public_id
+        ? `public_id=${encodeURIComponent(public_id)}`
+        : `url=${encodeURIComponent(url)}`;
+      const endpoint = `${API}/api/docimpression/file?${qs}`;
       const res = await fetch(endpoint, { method: "DELETE" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -127,9 +92,7 @@ function FileCard({ file, onDeleted }) {
   } else {
     const ext = (format || guessFormatFromUrl(url) || "").toUpperCase();
     const isPDF =
-      (format || "").toLowerCase() === "pdf" ||
-      (openUrl || "").toLowerCase().includes(".pdf") ||
-      isLocalPdfUrl(url);
+      (format || "").toLowerCase() === "pdf" || (openUrl || "").toLowerCase().includes(".pdf");
 
     preview = (
       <a
@@ -190,7 +153,7 @@ function FileCard({ file, onDeleted }) {
 }
 
 export default function DocsList({ docs = [], onRefresh }) {
-  const [deletingTick, setDeletingTick] = useState(0);
+  const [_, setDeletingTick] = useState(0);
 
   if (!docs.length) {
     return (
@@ -201,10 +164,8 @@ export default function DocsList({ docs = [], onRefresh }) {
   }
 
   function handleDeleted() {
-    // si le parent a fourni onRefresh (Pages/DocsPrinting), on l’utilise
     if (onRefresh) return onRefresh();
-    // sinon, petit tick pour forcer un re-render si tu gères localement
-    setDeletingTick((t) => t + 1);
+    setDeletingTick((t) => t + 1); // force re-render si pas de refresh parent
   }
 
   return (

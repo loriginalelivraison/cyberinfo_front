@@ -5,55 +5,13 @@ import DocsList from "../components/DocsList.jsx";
 
 const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
 
-// Endpoints locaux
+// Endpoints API (cloudinary via backend)
 const PDF_UPLOAD_ENDPOINT   = `${API}/api/upload/pdf`;
 const IMAGE_UPLOAD_ENDPOINT = `${API}/api/upload/image`;
 const VIDEO_UPLOAD_ENDPOINT = `${API}/api/upload/video`;
-const FILE_UPLOAD_ENDPOINT  = `${API}/api/upload/file`; // générique (docx/xlsx/zip/apk...)
+const FILE_UPLOAD_ENDPOINT  = `${API}/api/upload/file`; // docx/xlsx/zip/apk...
 
 // ---------- helpers upload ----------
-// Détecte/normalise une URL locale d'uploads -> /api/uploads/...
-function normalizeLocalUploads(u) {
-  try {
-    const url = new URL(u, window.location.origin);
-    const p = url.pathname;
-    if (p.startsWith("/api/uploads/")) return p;      // déjà bon
-    if (p.startsWith("/uploads/")) return `/api${p}`; // ajoute le préfixe /api
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function buildOpenUrl({ url, public_id, format, resource_type }) {
-  // 1) si c'est un fichier local => route statique /api/uploads/...
-  const local = normalizeLocalUploads(url);
-  if (local) return `${API}${local}`; // en prod: "/api/...", en dev: "http://localhost:8080/api/..."
-
-  // 2) sinon (Cloudinary, lien externe, etc.)
-  return url || "#";
-}
-
-// URL de téléchargement (tu peux garder la tienne, ou harmoniser pareil)
-function buildDownloadUrl({ url, public_id, format, resource_type }) {
-  const local = normalizeLocalUploads(url);
-  if (local) {
-    // si tu veux “forcer téléchargement”, garde tes endpoints /api/upload/<type>/<file>
-    // ou sinon télécharge direct la ressource statique:
-    return `${API}${local}`;
-  }
-  try {
-    if (url && url.includes("/api/upload/")) {
-      const u = new URL(url, window.location.origin);
-      u.pathname = u.pathname.replace("/api/upload/", "/api/upload/fl_attachment/");
-      return u.toString();
-    }
-  } catch {}
-  return url || "#";
-}
-
-
-
 function resourceTypeFor(file) {
   const name = (file.name || "").toLowerCase();
   const type = (file.type || "").toLowerCase();
@@ -61,15 +19,14 @@ function resourceTypeFor(file) {
   if (type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|heic|bmp|tiff)$/i.test(name)) {
     return "image";
   }
-  if (type.startsWith("video/") || type.startsWith("audio/") ||
-      /\.(mp4|mov|avi|mkv|webm|m4v|mp3|wav|ogg|m4a)$/i.test(name)) {
-    return "video"; // on groupe médias
+  if (type.startsWith("video/") || type.startsWith("audio/")
+      || /\.(mp4|mov|avi|mkv|webm|m4v|mp3|wav|ogg|m4a)$/i.test(name)) {
+    return "video";
   }
   if (type === "application/pdf" || /\.pdf$/i.test(name)) {
     return "raw"; // PDF
   }
-  // tout le reste (docx/xlsx/pptx/csv/zip/rar/7z/apk/exe/etc.)
-  return "file";
+  return "file"; // docx/xlsx/pptx/csv/zip/...
 }
 
 async function uploadTo(endpoint, file) {
@@ -77,7 +34,7 @@ async function uploadTo(endpoint, file) {
   form.append("file", file);
   const res = await fetch(endpoint, { method: "POST", body: form });
   if (!res.ok) throw new Error(`Upload ${endpoint} HTTP ${res.status}`);
-  return res.json(); // { ok, url, bytes, originalname }
+  return res.json(); // { ok, url, public_id, bytes, originalname, ... }
 }
 
 // ---------- helpers liste ----------
@@ -96,7 +53,7 @@ function normalizeDocs(data) {
   const out = [];
   for (const item of data) {
     if (Array.isArray(item.files)) {
-      if (item.files.length === 0) continue; // ne rien pousser si plus de fichiers
+      if (item.files.length === 0) continue;
       for (const f of item.files) {
         const url = f.secure_url || f.url;
         if (!url) continue;
@@ -136,7 +93,7 @@ export default function Printing() {
   const [msg, setMsg] = useState(null);
   const [err, setErr] = useState(null);
 
-  // état de la liste (en bas du formulaire)
+  // liste sous le formulaire
   const [docs, setDocs] = useState([]);
   const [listLoading, setListLoading] = useState(false);
   const [listErr, setListErr] = useState(null);
@@ -189,40 +146,40 @@ export default function Printing() {
         Promise.all(imgs.map(async (f) => {
           const r = await uploadTo(IMAGE_UPLOAD_ENDPOINT, f);
           const ext = (f.name?.split(".").pop() || "jpg").toLowerCase();
-          return { url: r.url, secure_url: r.url, public_id: null, format: ext, bytes: r.bytes || f.size, resource_type: "image", original_filename: r.originalname || f.name };
+          return { url: r.url, public_id: r.public_id, format: ext, bytes: r.bytes || f.size, resource_type: "image", originalname: r.originalname || f.name };
         })),
         Promise.all(medias.map(async (f) => {
           const r = await uploadTo(VIDEO_UPLOAD_ENDPOINT, f);
           const ext = (f.name?.split(".").pop() || "mp4").toLowerCase();
-          return { url: r.url, secure_url: r.url, public_id: null, format: ext, bytes: r.bytes || f.size, resource_type: "video", original_filename: r.originalname || f.name };
+          return { url: r.url, public_id: r.public_id, format: ext, bytes: r.bytes || f.size, resource_type: "video", originalname: r.originalname || f.name };
         })),
         Promise.all(pdfs.map(async (f) => {
           const r = await uploadTo(PDF_UPLOAD_ENDPOINT, f);
           const ext = "pdf";
-          return { url: r.url, secure_url: r.url, public_id: null, format: ext, bytes: r.bytes || f.size, resource_type: "raw", original_filename: r.originalname || f.name };
+          return { url: r.url, public_id: r.public_id, format: ext, bytes: r.bytes || f.size, resource_type: "raw", originalname: r.originalname || f.name };
         })),
         Promise.all(others.map(async (f) => {
           const r = await uploadTo(FILE_UPLOAD_ENDPOINT, f);
           const ext = (f.name?.split(".").pop() || "").toLowerCase();
-          return { url: r.url, secure_url: r.url, public_id: null, format: ext, bytes: r.bytes || f.size, resource_type: "file", original_filename: r.originalname || f.name };
+          return { url: r.url, public_id: r.public_id, format: ext, bytes: r.bytes || f.size, resource_type: "file", originalname: r.originalname || f.name };
         })),
       ]);
 
       const uploaded = [...imgRes, ...mediaRes, ...pdfRes, ...fileRes];
 
-      // Sauvegarde BDD
+      // Sauvegarde en BDD
       const saveRes = await fetch(`${API}/api/docimpression`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: nom.trim(),
           files: uploaded.map((u) => ({
-            url: u.secure_url || u.url,
-            public_id: u.public_id,
+            url: u.url,
+            public_id: u.public_id,                 // ✅ IMPORTANT
             format: u.format,
             bytes: u.bytes,
-            resource_type: u.resource_type, // "image" | "video" | "raw" | "file"
-            original_filename: u.original_filename,
+            resource_type: u.resource_type,         // "image" | "video" | "raw" | "file"
+            original_filename: u.originalname,      // champ stocké côté BDD
           })),
         }),
       });
@@ -233,7 +190,6 @@ export default function Printing() {
       const input = document.getElementById("file-input");
       if (input) input.value = "";
 
-      // 🔄 recharge la liste et scroll vers la section
       await fetchDocs();
       listAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
@@ -293,11 +249,10 @@ export default function Printing() {
         </form>
       </div>
 
-      {/* --- Liste des documents envoyés (même rendu que la page DocsPrinting) --- */}
+      {/* --- Liste des documents envoyés (même rendu que DocsPrinting) --- */}
       <div ref={listAnchorRef} className="max-w-5xl mx-auto px-4 mt-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Fichiers récemment envoyés</h2>
-          
         </div>
 
         {listErr && <div className="p-4 text-sm text-red-600">{listErr}</div>}
