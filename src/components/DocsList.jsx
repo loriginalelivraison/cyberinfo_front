@@ -3,32 +3,12 @@ import { useMemo, useState } from "react";
 
 const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
 
-/* Détecte un type affichable à partir de l’URL/format/resource_type
-   (Cloudinary renvoie resource_type: "image" | "video" | "raw") */
+/* ---------- Utils ---------- */
 function guessFormatFromUrl(u) {
   try {
     const m = new URL(u).pathname.match(/\.([a-z0-9]+)$/i);
     return m ? m[1].toLowerCase() : undefined;
   } catch { return undefined; }
-}
-
-function deriveResourceType({ url, resource_type, format }) {
-  if (resource_type) return resource_type;
-  const ext = (format || guessFormatFromUrl(url) || "").toLowerCase();
-  if (["mp4","webm","mov","mkv","avi","m4v"].includes(ext)) return "video";
-  if (["mp3","wav","ogg","m4a"].includes(ext)) return "audio";
-  if (["jpg","jpeg","png","gif","webp","heic","bmp","tiff"].includes(ext)) return "image";
-  if (["pdf"].includes(ext)) return "raw";
-  return "file";
-}
-
-// Forcer le téléchargement Cloudinary : /upload/ -> /upload/fl_attachment/
-function toDownloadUrl(u) {
-  try {
-    const cu = new URL(u);
-    cu.pathname = cu.pathname.replace("/upload/", "/upload/fl_attachment/");
-    return cu.toString();
-  } catch { return u; }
 }
 
 function humanSize(bytes) {
@@ -42,6 +22,59 @@ function humanSize(bytes) {
   return `${gb.toFixed(2)} Go`;
 }
 
+// Déduit le type (juste pour l’affichage)
+function deriveResourceType({ url, resource_type, format }) {
+  if (resource_type) return resource_type;
+  const ext = (format || guessFormatFromUrl(url) || "").toLowerCase();
+  if (["mp4","webm","mov","mkv","avi","m4v"].includes(ext)) return "video";
+  if (["mp3","wav","ogg","m4a"].includes(ext)) return "audio";
+  if (["jpg","jpeg","png","gif","webp","heic","bmp","tiff"].includes(ext)) return "image";
+  if (["pdf"].includes(ext)) return "raw";
+  return "file";
+}
+
+// Assure un nom de fichier avec extension (d’après name/format/url/public_id)
+function buildDownloadFilename({ name, format, url, public_id }) {
+  const ext = (format || guessFormatFromUrl(url) || "").toLowerCase();
+  const hasExt = !!(name && /\.[a-z0-9]+$/i.test(name));
+  if (name && hasExt) return name;
+  if (name && ext) return `${name}.${ext}`;
+  if (public_id && ext) return `${public_id.split("/").pop()}.${ext}`;
+  return name || public_id || "fichier";
+}
+
+// Construit l’URL du proxy de download (robuste dev/prod)
+function buildProxyUrl(apiBase, fileUrl, filename) {
+  const base = apiBase && apiBase.trim()
+    ? apiBase.replace(/\/+$/, "")
+    : window.location.origin;
+  const u = new URL("/api/download", base);
+  u.searchParams.set("url", fileUrl);
+  if (filename) u.searchParams.set("filename", filename);
+  return u.toString();
+}
+
+// Force un vrai téléchargement via fetch -> blob -> <a download>
+async function forceDownload(url, filename) {
+  try {
+    const res = await fetch(url, { redirect: "follow" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objUrl;
+    a.download = filename || "fichier";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(objUrl);
+  } catch (e) {
+    // Fallback : ouvre dans un nouvel onglet si quelque chose bloque
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
+
+/* ---------- UI ---------- */
 function FileCard({ file, onDeleted }) {
   const { url, public_id, format, bytes, resource_type, name, uploadedAt } = file;
 
@@ -50,8 +83,9 @@ function FileCard({ file, onDeleted }) {
     [url, resource_type, format]
   );
 
-  const openUrl = url;                 // Ouvrir directement l’URL Cloudinary
-  const downloadUrl = toDownloadUrl(url);
+  const openUrl = url;
+  const downloadFilename = buildDownloadFilename({ name, format, url, public_id });
+  const proxyDownloadUrl = buildProxyUrl(API, url, downloadFilename);
 
   async function handleDelete() {
     const ok = confirm(`Supprimer ce fichier "${name || url}" ?`);
@@ -73,7 +107,6 @@ function FileCard({ file, onDeleted }) {
 
   // Vignette / preview
   let preview = null;
-
   if (rt === "image") {
     preview = (
       <a href={openUrl} target="_blank" rel="noreferrer">
@@ -90,10 +123,8 @@ function FileCard({ file, onDeleted }) {
   } else if (rt === "audio") {
     preview = <audio src={openUrl} controls className="w-full" />;
   } else {
-    const ext = (format || guessFormatFromUrl(url) || "").toUpperCase();
-    const isPDF =
-      (format || "").toLowerCase() === "pdf" || (openUrl || "").toLowerCase().includes(".pdf");
-
+    const extUp = (format || guessFormatFromUrl(url) || "").toUpperCase();
+    const isPDF = (format || "").toLowerCase() === "pdf" || (openUrl || "").toLowerCase().includes(".pdf");
     preview = (
       <a
         href={openUrl}
@@ -103,7 +134,7 @@ function FileCard({ file, onDeleted }) {
         title="Ouvrir"
       >
         <div className="text-sm text-gray-600">
-          {isPDF ? "📄 PDF" : "📦 Fichier"} — {ext || "?"}
+          {isPDF ? "📄 PDF" : "📦 Fichier"} — {extUp || "?"}
         </div>
       </a>
     );
@@ -126,20 +157,25 @@ function FileCard({ file, onDeleted }) {
       </div>
 
       <div className="flex gap-2">
-        <a
-          href={downloadUrl}
+        {/* ⬇️ ICI : on force le téléchargement via blob (utile pour les images qui s’ouvrent sinon) */}
+        <button
+          onClick={() => forceDownload(proxyDownloadUrl, downloadFilename)}
           className="flex-1 text-center rounded-xl bg-amber-500 text-white py-2 font-semibold hover:bg-amber-600 transition"
+          title="Télécharger"
         >
           تحميل
-        </a>
+        </button>
+
         <a
           href={openUrl}
           target="_blank"
           rel="noreferrer"
           className="flex-1 text-center rounded-xl border py-2 font-semibold bg-blue-400 transition"
+          title="Ouvrir"
         >
           فتح
         </a>
+
         <button
           onClick={handleDelete}
           className=" min-w-[80px] text-center rounded-xl border border-red-500 text-red-600 py-2 font-semibold hover:bg-red-50 transition"
@@ -165,7 +201,7 @@ export default function DocsList({ docs = [], onRefresh }) {
 
   function handleDeleted() {
     if (onRefresh) return onRefresh();
-    setDeletingTick((t) => t + 1); // force re-render si pas de refresh parent
+    setDeletingTick((t) => t + 1);
   }
 
   return (
