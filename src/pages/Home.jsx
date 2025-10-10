@@ -6,7 +6,7 @@ export default function Home() {
     { to: "/aadl",     label: " AADL",   emoji: "🏠" },
     { to: "/printing", label: "Impression" ,         emoji: "🖨️" },
     { to: "/internet", label: "Internet",       emoji: "🌐" },
-    { to: "/scans",    label: "Scan & Copie",       emoji: "📄" },
+    { to: "/scans",    label: "convertion",       emoji: "📄" },
     { to: "/contact",  label: "Contact",          emoji: "📞" },
     { to: "/contact",  label: "Contact",          emoji: "📞" },
     { to: "/contact",  label: "Contact",          emoji: "📞" },

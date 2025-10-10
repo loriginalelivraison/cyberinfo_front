@@ -166,16 +166,7 @@ function FileCard({ file, onDeleted }) {
           تحميل
         </button>
 
-        <a
-          href={openUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="flex-1 text-center rounded-xl border py-2 font-semibold bg-blue-400 transition"
-          title="Ouvrir"
-        >
-          فتح
-        </a>
-
+        
         <button
           onClick={handleDelete}
           className=" min-w-[80px] text-center rounded-xl border border-red-500 text-red-600 py-2 font-semibold hover:bg-red-50 transition"
