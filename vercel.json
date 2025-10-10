@@ -1,6 +1,6 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://cyberinfo-lshb.onrender.com/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://cyberinfo-1.onrender.com/api/:path*" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
