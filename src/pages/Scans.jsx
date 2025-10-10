@@ -2,7 +2,9 @@
 import { useState, useRef } from "react";
 import Logo from "../components/Logo.jsx";
 
-const API = import.meta.env.DEV ? (import.meta.env.VITE_API_URL ?? "") : "";
+// En dev on lit VITE_API_URL, en prod on laisse vide si tu utilises les rewrites Vercel.
+// Si tu n'utilises PAS les rewrites, mets VITE_API_URL=https://<ton-back>.onrender.com
+const API = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL : "";
 
 export default function Scans() {
   const [file, setFile] = useState(null);
@@ -16,7 +18,6 @@ export default function Scans() {
     setErr(null);
     setMsg(null);
     if (!f) return setFile(null);
-    // sécurité: PDF uniquement
     const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || "");
     if (!isPdf) {
       setErr("Veuillez sélectionner un fichier PDF.");
@@ -40,8 +41,8 @@ export default function Scans() {
       const form = new FormData();
       form.append("file", file);
 
-      // Appelle le backend qui convertit via LibreOffice (route déjà ajoutée côté serveur)
-      const res = await fetch(`${API}/api/convert/pdf-to-word/word`, {
+      // ✅ Endpoint correct en Linux/Render
+      const res = await fetch(`${API}/api/convert/pdf-to-word`, {
         method: "POST",
         body: form,
       });
@@ -52,7 +53,6 @@ export default function Scans() {
         throw new Error(msg);
       }
 
-      // Récupère le DOCX en binaire et déclenche le téléchargement
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -65,7 +65,6 @@ export default function Scans() {
       URL.revokeObjectURL(url);
 
       setMsg("Conversion terminée ✅ Le fichier Word a été téléchargé.");
-      // reset
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
     } catch (e) {
@@ -79,7 +78,7 @@ export default function Scans() {
     <div className="min-h-screen pb-10">
       <div className="max-w-xl mx-auto px-4 pt-10 text-center">
         <Logo />
-        <p className="text-gray-600 mt-1"> Word إلى PDF </p>
+        <p className="text-gray-600 mt-1"> PDF → Word </p>
       </div>
 
       <div className="max-w-xl mx-auto px-4 py-6">
@@ -117,9 +116,7 @@ export default function Scans() {
         </form>
 
         <div className="mt-4 text-xs text-gray-500">
-          Astuce : pour un meilleur résultat, assurez-vous que le PDF contient du texte
-          sélectionnable (pas uniquement des images). Si le PDF vient d’un scan, un OCR
-          peut être nécessaire pour un Word pleinement éditable.
+          Astuce : si le PDF est un scan (images), il faudra de l’OCR pour un Word pleinement éditable.
         </div>
       </div>
     </div>
